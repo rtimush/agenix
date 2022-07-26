@@ -206,7 +206,7 @@ in
       ];
     }
 
-    (mkIf (!isDarwin) {
+    (optionalAttrs (!isDarwin) {
       # Create a new directory full of secrets for symlinking (this helps
       # ensure removed secrets are actually removed, or at least become
       # invalid symlinks).
@@ -249,7 +249,7 @@ in
       };
     })
 
-    (mkIf isDarwin {
+    (optionalAttrs isDarwin {
       system.activationScripts = {
         # Secrets with root owner and group can be installed before users
         # exist. This allows user password files to be encrypted.
@@ -263,6 +263,23 @@ in
           ${chownKeys}
           ${installNonRootSecrets}
         '';
+      };
+
+      launchd.daemons.activate-agenix = {
+        script = ''
+          set -e
+          set -o pipefail
+          export PATH="${pkgs.gnugrep}/bin:${pkgs.coreutils}/bin:@out@/sw/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+
+          ${mountSecrets}
+          ${installRootOwnedSecrets}
+          ${chownKeys}
+          ${installNonRootSecrets}
+
+          exit 0
+        '';
+        serviceConfig.RunAtLoad = true;
+        serviceConfig.KeepAlive.SuccessfulExit = false;
       };
     })
   ]));
